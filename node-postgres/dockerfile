@@ -1,0 +1,51 @@
+FROM postgres:9.6
+
+#BY Karol Z., Marti M., Marc O.
+
+ARG DB_USER
+ARG DB_PASSWORD
+ARG DB_NAME
+ARG DB_LOCALE
+
+#
+# Ensure `www-backup` group exists
+#
+RUN addgroup www-backup ;\
+    addgroup postgres www-backup && exit 0 ; exit 1
+
+#
+# Set up `backup` directory
+#
+RUN mkdir -p /home/postgres/backup ;\
+    chown postgres:postgres /home/postgres ;\
+    chown postgres:www-backup /home/postgres/backup ;\
+    chmod 750 /home/postgres/backup
+
+#
+# Create mount points
+#
+VOLUME ["/home/postgres/backup"]
+
+#
+# Set default locale
+#
+RUN localedef -i ${DB_LOCALE} -c -f UTF-8 -A /usr/share/locale/locale.alias ${DB_LOCALE}.UTF-8
+ENV LANG ${DB_LOCALE}.utf8
+
+#
+# Install initdb scripts
+#
+COPY ./initdb.d /docker-entrypoint-initdb.d
+
+#RUN rm /var/lib/postgres/data/postgresql.conf
+
+#COPY ./postgresql.conf /var/lib/postgresql
+#     chown postgres:postgres /var/lib/postgresql/data/postgresql.conf
+
+#CMD ["postgres", "-c", "config_file=/var/lib/postgresql/postgresql.conf"]
+
+# RUN for file in /docker-entrypoint-initdb.d/*; do \
+        # sed -i "s/{DB_NAME}/${DB_NAME}/g" $file ;\
+        # sed -i "s/{DB_USER}/${DB_USER}/g" $file ;\
+        # sed -i "s/{DB_PASSWORD}/${DB_PASSWORD}/g" $file ;\
+    # done

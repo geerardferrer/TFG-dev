@@ -1,0 +1,48 @@
+FROM rocker/r-ver:4.3.0
+
+RUN mkdir /home/ruser
+RUN mkdir /home/ruser/forecastModels
+RUN mkdir /home/ruser/forecastsCache
+
+COPY TimeSeriesFunctions_GPL_0.6.R /home/ruser/TimeSeriesFunctions_GPL_0.6.R
+COPY TimeSeriesFunctions_APACHE_0.6.R /home/ruser/TimeSeriesFunctions_APACHE_0.6.R
+
+CMD docker run -v ~/forecastModels:/home/ruser/forecastModels
+CMD docker run -v ~/forecastsCache:/home/ruser/forecastsCache
+
+
+ENTRYPOINT R -e '\
+if(!require(devtools)){ \
+  install.packages("devtools"); \
+  library(devtools); \
+}; \
+if(!require(Rserve)){ \
+  install_version("Rserve", version="1.8-11"); \
+  library(Rserve); \
+}; \
+if(!require(mongolite)){ \
+  install_version("mongolite", version="2.7.2"); \
+  library(mongolite); \
+}; \
+if(!require(prophet)){ \
+  install_version("prophet", version="1.0"); \
+  library(prophet); \
+}; \
+if(!require(forecast)){ \
+  install_version("forecast", version="8.21"); \
+  library(forecast); \
+}; \
+if(!require(forecastHybrid)){ \
+  install_version("forecastHybrid", version="5.0.19"); \
+  library(forecastHybrid); \
+}; \
+if(!require(curl)){ \
+  install_version("curl", version="5.0.0"); \
+  library(curl); \
+}; \
+print("starting Rserve with love <3 ..."); \
+Rserve::run.Rserve(remote=TRUE)'
+
+
+
+

@@ -1,0 +1,10 @@
+FROM tomcat:9.0.16-jre8
+
+#BY Karol Z., Marti M., Marc O.
+
+RUN addgroup -g 82 -S www-data ;\
+    addgroup root www-data && exit 0 ; exit 1
+
+RUN mkdir /home/pabre-db
+RUN chown www-data: /home/pabre-db
+RUN chmod u+w /home/pabre-db

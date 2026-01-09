@@ -1,0 +1,82 @@
+# ============================================
+# .gitignore principal del proyecto TFG
+# ============================================
+
+# Archivo de configuración con datos sensibles
+.env
+
+# Archivos de ngrok
+ngrok.yml
+
+# ============================================
+# DATOS Y CARPETAS GRANDES DE DOCKER
+# ============================================
+# Excluir datos de MongoDB y PostgreSQL (solo queremos la config)
+node-mongodb/data/
+node-mongodb/data_old*/
+node-postgres/data/
+node-postgres/initdb.d/*.sql
+
+# Node R-base: excluir cache y modelos generados, mantener scripts
+node-rbase/forecastModels/
+node-rbase/forecastsCache/
+node-rbase/.Rhistory
+
+# Excluir toda la carpeta www (contiene bases de datos enormes)
+# Son datos generados, no configuración
+www/
+
+# Solo mantener scripts de configuración específicos si existen
+!www/*.sh
+!www/README.md
+
+# Logs
+*.log
+logs/
+
+# Archivos temporales
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Node modules (si se usan en la raíz)
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+myenv/
+venv/
+env/
+
+# Java/Maven
+target/
+*.class
+*.jar
+*.war
+
+# Docker
+.dockerignore
+
+# Backups
+*.bak
+backup/

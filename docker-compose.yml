@@ -1,0 +1,266 @@
+#version: '2.1' 
+
+# ============================================
+# DOCKER COMPOSE - TFG Learning Dashboard
+# ============================================
+# Todas las variables de entorno se gestionan desde el archivo .env en la raíz
+# Copiar .env.template a .env y configurar con tus valores
+
+services:
+
+  db:
+    build:
+      context: ./node-postgres/
+      args:
+        - DB_USER
+        - DB_NAME
+        - DB_PASSWORD
+        - DB_LOCALE        
+    container_name: qrapids_postgres
+    environment:
+    - DB_USER
+    - DB_PASSWORD
+    - DB_LOCALE
+    - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+    - "127.0.0.1:${DB_PORT}:5432"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+    volumes:
+    - ${COMPOSE_PROJECT_HOME}/www/db/backup:/home/postgres/backup
+    - postgresql:/var/lib/postgresql/data
+    networks: 
+    - qrapids
+    restart: always
+
+
+  mongodb:
+    build:
+      context: ./node-mongodb/
+    container_name: ingest_mongodb
+    user: "0:0"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ connectionStatus: 1 }).ok'"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+    volumes:
+      - mongo_data:/data/db
+      - ${COMPOSE_PROJECT_HOME}/node-mongodb/config/mongod.conf:/etc/mongod.conf
+      - ${COMPOSE_PROJECT_HOME}/node-mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
+    ports:
+    - "127.0.0.1:${MONGO_PORT}:27017"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "2"
+    env_file:
+      - .env
+    environment:
+    - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+    - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+    - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+    - qrapids
+
+  tomcat:
+    build:
+      context: ./node-tomcat
+    container_name: qrapids_tomcat
+    environment:
+    - QRAPIDS_CONFIG_DIR
+    - QRAPIDS_DATA_DIR
+    - spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+    - spring.jpa.database=POSTGRESQL
+    - spring.jpa.show-sql=false
+    - spring.jmx.enabled=false
+    - server.port=8080
+    - server.url=${LD_SERVER_URL}
+    # Local connection
+    - spring.datasource.driver-class-name=org.postgresql.Driver
+    - spring.datasource.platform=postgres
+    - spring.datasource.url=jdbc:postgresql://db:5432/postgres
+    - spring.datasource.username=postgres
+    - spring.datasource.password=example
+    # QMA (Quality Model Assessment), connection to the MongoDB database
+    - qma.ip=mongodb
+    - qma.port=27017
+    - qma.database.name=mongo
+    - qma.username=admin
+    - qma.password=3LnS985q7tR9
+    # Endpoints
+    - pabre.url=http://gessi3.cs.upc.edu/pabre-ws
+    - assessSI.url=http://tomcat:8080/LD-si_assessment-rest-0.1
+    - backlog.milestones.url=
+    - backlog.newIssue.url=
+    - backlog.phases.url=
+    # Help menu links
+    - help.userguide=https://github.com/Learning-Dashboard/LD-learning-dashboard/wiki/User-Guide
+    - help.support=https://github.com/Learning-Dashboard/Bug-Reporting
+    - about.custom.text=Q-Rapids Docker Solution
+    - fakeData=false
+    - demoMode=false
+    # Security Shield
+    - security.enable=true
+    - security.api.enable=true  
+    # Anonymization encryption method
+    - database.encryption.key=ntw9tA8jwVjAyNMDVIQ4dEAOy87tHRnp
+    - database.encryption.initvector=e37ec2589341eb09
+    - database.encryption.algorithm=AES/CBC/PKCS5PADDING
+    # Forecast
+    - forecast.technique=PROPHET
+    - forecast.url=http://tomcat:8080/LD-forecast-rest-0.5
+    - forecast.ip=mongodb
+    - forecast.port=27017
+    - forecast.database=mongo
+    - forecast.username=
+    - forecast.password=
+    # Rserve
+    - Rserve.host=rbase
+    - Rserve.port=6311
+    - Rscripts.location=/home/ruser/TimeSeriesFunctions_GPL_0.6.R
+    # Scheduled task config
+    - cron.expression=
+    - projects.dir=
+    # JasperServer connection
+    - jasperServer.url=
+    - jasperserver.user=
+    - jasperserver.password=
+    ports:
+    - "${WEB_PORT}:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1g"
+        max-file: "2"
+    links:
+    - db
+    external_links: 
+    - mongodb
+    - rbase
+    volumes:
+    - ${COMPOSE_PROJECT_HOME}/www/api/log:/usr/local/tomcat/logs
+    - ${COMPOSE_PROJECT_HOME}/www/api/public:/usr/local/tomcat/webapps
+    - ${COMPOSE_PROJECT_HOME}/www/api/config:${QRAPIDS_CONFIG_DIR}
+    - ${COMPOSE_PROJECT_HOME}/www/api/data:${QRAPIDS_DATA_DIR}
+    - ${COMPOSE_PROJECT_HOME}/node-tomcat/setenv.sh:/usr/local/tomcat/bin/setenv.sh:ro
+    - ${COMPOSE_PROJECT_HOME}/www/api/pabreDatabase:/home/pabre-db
+    networks:
+    - qrapids
+
+  ld_connect:
+    build:
+      context: ./LD_Connect_Event
+      dockerfile: Dockerfile
+    container_name: LDConnect
+    env_file:
+      - ./LD_Connect_Event/.env         
+    networks:
+      - qrapids 
+    environment:
+      - EVAL_HOST=ld_eval
+      - EVAL_PORT=5001
+      - MONGO_HOST=${MONGO_HOST}
+      - MONGO_PORT=${MONGO_PORT}
+      - MONGO_DB=${MONGO_DB}
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_AUTHSRC=${MONGO_AUTHSRC}
+      - TAIGA_API_URL=${TAIGA_API_URL}
+      - TAIGA_AUTH_URL=${TAIGA_AUTH_URL}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      mongodb:                   
+        condition: service_started
+    ports:
+      - "127.0.0.1:5000:5000"  
+    
+  ld_eval:
+    build:
+      context: ./LD_Eval_Event        
+      dockerfile: Dockerfile
+    volumes:
+      - ./LD_Eval_Event:/app
+    container_name: ldeval
+    env_file:
+      - ./LD_Eval_Event/.env
+    networks:
+      - qrapids                 
+    depends_on:
+      mongodb:                   
+        condition: service_started
+    ports:
+      - "127.0.0.1:5001:5001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"    
+
+  # ============================================
+  # LD ADMIN TOOL - Backend (Spring Boot)
+  # ============================================
+  admintool_backend:
+    build:
+      context: ./ld_admintool
+      dockerfile: Dockerfile
+    container_name: ld_admintool_backend
+    environment:
+      - SERVER_PORT=${ADMINTOOL_PORT:-8080}
+      - LD_API_URL=http://tomcat:8080/api
+      - LD_EVAL_URL=http://ld_eval:5001
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - TAIGA_API_URL=${TAIGA_API_URL}
+      - TAIGA_TOKEN=${TAIGA_TOKEN}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    networks:
+      - qrapids
+    depends_on:
+      - db
+      - ld_eval
+      - tomcat
+    ports:
+      - "127.0.0.1:${ADMINTOOL_PORT:-8080}:8080"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "2"
+
+  # ============================================
+  # LD ADMIN TOOL - Frontend (React + Vite)
+  # ============================================
+  admintool_frontend:
+    build:
+      context: ./ld_admintool_frontend
+      dockerfile: Dockerfile
+    container_name: ld_admintool_frontend
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8080}
+    networks:
+      - qrapids
+    depends_on:
+      - admintool_backend
+    ports:
+      - "127.0.0.1:3000:80"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "2"
+
+  
+  
+networks:
+  qrapids:
+    driver: bridge
+volumes:
+  postgresql:
+  mongo_data:
+    
